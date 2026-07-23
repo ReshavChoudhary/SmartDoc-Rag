@@ -47,6 +47,6 @@ uvicorn
 streamlit
 
 # Utilities
-
+langchain-huggingface
 tqdm
 requests

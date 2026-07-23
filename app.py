@@ -10,6 +10,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 
+
 load_dotenv()
 
 st.set_page_config(page_title="RAG Book Assistant")
@@ -17,7 +18,23 @@ st.set_page_config(page_title="RAG Book Assistant")
 st.title("📚 RAG Book Assistant")
 st.write("Upload a PDF and ask questions from the document")
 
-uploaded_file = st.file_uploader("Upload a PDF book", type="pdf")
+
+# Get Groq API Key
+groq_api_key = os.getenv("GROQ_API_KEY")
+
+if not groq_api_key:
+    try:
+        groq_api_key = st.secrets["GROQ_API_KEY"]
+    except:
+        st.error("GROQ_API_KEY is missing. Please add it in Streamlit Secrets.")
+        st.stop()
+
+
+uploaded_file = st.file_uploader(
+    "Upload a PDF book",
+    type="pdf"
+)
+
 
 if uploaded_file:
 
@@ -27,23 +44,29 @@ if uploaded_file:
 
     st.success("PDF uploaded successfully!")
 
+
     if st.button("Create Vector Database"):
 
         with st.spinner("Processing document..."):
 
             loader = PyPDFLoader(file_path)
+
             docs = loader.load()
+
 
             splitter = RecursiveCharacterTextSplitter(
                 chunk_size=1000,
                 chunk_overlap=200
             )
 
+
             chunks = splitter.split_documents(docs)
+
 
             embeddings = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
+
 
             vectorstore = Chroma.from_documents(
                 documents=chunks,
@@ -51,20 +74,26 @@ if uploaded_file:
                 persist_directory="chroma_db"
             )
 
+
             vectorstore.persist()
+
 
         st.success("Vector database created!")
 
+
 if os.path.exists("chroma_db"):
+
 
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
+
     vectorstore = Chroma(
         persist_directory="chroma_db",
         embedding_function=embeddings
     )
+
 
     retriever = vectorstore.as_retriever(
         search_type="mmr",
@@ -75,25 +104,32 @@ if os.path.exists("chroma_db"):
         }
     )
 
+
     llm = ChatGroq(
-        model="llama-3.3-70b-versatile"
+        model="llama-3.3-70b-versatile",
+        groq_api_key=groq_api_key
     )
+
 
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """You are a helpful AI assistant.
+                """
+You are a helpful AI assistant.
 
 Use ONLY the provided context to answer the question.
 
 If the answer is not present in the context,
-say: "I could not find the answer in the document."
+say:
+"I could not find the answer in the document."
 """
             ),
+
             (
                 "human",
-                """Context:
+                """
+Context:
 {context}
 
 Question:
@@ -103,25 +139,41 @@ Question:
         ]
     )
 
+
     st.divider()
+
     st.subheader("Ask Questions From the Book")
 
-    query = st.text_input("Enter your question")
+
+    query = st.text_input(
+        "Enter your question"
+    )
+
 
     if query:
 
         docs = retriever.invoke(query)
 
+
         context = "\n\n".join(
-            [doc.page_content for doc in docs]
+            [
+                doc.page_content
+                for doc in docs
+            ]
         )
 
-        final_prompt = prompt.invoke({
-            "context": context,
-            "question": query
-        })
+
+        final_prompt = prompt.invoke(
+            {
+                "context": context,
+                "question": query
+            }
+        )
+
 
         response = llm.invoke(final_prompt)
 
+
         st.write("### AI Answer")
+
         st.write(response.content)

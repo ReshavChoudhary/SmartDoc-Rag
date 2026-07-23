@@ -14,8 +14,10 @@ mistralai
 chromadb
 
 # Embedding Models
-
 sentence-transformers
+langchain-huggingface
+torch
+torchvision
 
 # Document Loaders dependencies
 
